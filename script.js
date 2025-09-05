@@ -6,14 +6,14 @@ document.addEventListener('DOMContentLoaded', () => {
     let nextOrderId = 1;
 
     const products = [
-        { id: 1, name: 'Alface Crespa', price: 3.50, unit: 'unidade', image: 'https://placehold.co/400x400/22c55e/ffffff?text=Alface', stock: 50 },
-        { id: 2, name: 'Tomate Italiano', price: 8.99, unit: 'kg', image: 'https://placehold.co/400x400/ef4444/ffffff?text=Tomate', stock: 30 },
-        { id: 3, name: 'Cebola Branca', price: 5.49, unit: 'kg', image: 'https://placehold.co/400x400/f3f4f6/333333?text=Cebola', stock: 40 },
-        { id: 4, name: 'Batata Inglesa', price: 4.99, unit: 'kg', image: 'https://placehold.co/400x400/f59e0b/ffffff?text=Batata', stock: 60 },
-        { id: 5, name: 'Cenoura', price: 4.50, unit: 'kg', image: 'https://placehold.co/400x400/f97316/ffffff?text=Cenoura', stock: 35 },
-        { id: 6, name: 'Maçã Fuji', price: 9.90, unit: 'kg', image: 'https://placehold.co/400x400/dc2626/ffffff?text=Maçã', stock: 25 },
-        { id: 7, name: 'Banana Nanica', price: 6.50, unit: 'dúzia', image: 'https://placehold.co/400x400/eab308/ffffff?text=Banana', stock: 20 },
-        { id: 8, name: 'Cheiro Verde', price: 2.50, unit: 'maço', image: 'https://placehold.co/400x400/16a34a/ffffff?text=Salsa', stock: 45 },
+        { id: 1, name: 'Alface Crespa', price: 3.50, unit: 'unidade', image: 'https://52586.cdn.lojaquevende.com.br/static/52586/sku/verduras-Alface-Crespa-1586828067472.jpg', stock: 50 },
+        { id: 2, name: 'Tomate Italiano', price: 8.99, unit: 'kg', image: 'https://www.infoescola.com/wp-content/uploads/2011/01/tomate_345187874.jpg', stock: 30 },
+        { id: 3, name: 'Cebola Branca', price: 5.49, unit: 'kg', image: 'https://www.hortifrutiorganico.com.br/36-large_default/cebola-organica-500g.jpg', stock: 40 },
+        { id: 4, name: 'Batata Inglesa', price: 4.99, unit: 'kg', image: 'https://mercadoorganico.com/6428-large_default/batata-inglesa-organica-500g-osm.jpg', stock: 60 },
+        { id: 5, name: 'Cenoura', price: 4.50, unit: 'kg', image: 'https://www.maisquitanda.com.br/image/cache/1-verduras-legumes/cenoura%20rama-800x800.png', stock: 35 },
+        { id: 6, name: 'Maçã Fuji', price: 9.90, unit: 'kg', image: 'https://acdn-us.mitiendanube.com/stores/002/296/660/products/fuji1-0d7cea47617b6b720216606777783880-1024-1024.jpg', stock: 25 },
+        { id: 7, name: 'Banana Nanica', price: 6.50, unit: 'dúzia', image: 'https://vallefrutas.com.br/wp-content/uploads/banana-nanica.png', stock: 20 },
+        { id: 8, name: 'Cheiro Verde', price: 2.50, unit: 'maço', image: 'https://mondiniplantas.cdn.magazord.com.br/img/2021/07/produto/1210/salsa-lisa.jpg', stock: 45 },
     ];
     
     // --- DOM ELEMENTS ---
