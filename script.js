@@ -4,6 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let cart = [];
     let orders = [];
     let nextOrderId = 1;
+    let checkoutAfterLogin = false; // Flag to handle checkout after login
 
     const products = [
         { id: 1, name: 'Alface Crespa', price: 3.50, unit: 'unidade', image: 'https://52586.cdn.lojaquevende.com.br/static/52586/sku/verduras-Alface-Crespa-1586828067472.jpg', stock: 50 },
@@ -47,6 +48,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- NAVIGATION ---
     function showPage(pageToShow) {
         [authPage, productsPage, adminPage].forEach(page => page.classList.add('hidden'));
+        appHeader.classList.add('hidden'); // Hide header by default
+        
+        if (pageToShow !== authPage) {
+            appHeader.classList.remove('hidden');
+        }
         pageToShow.classList.remove('hidden');
     }
 
@@ -79,13 +85,57 @@ document.addEventListener('DOMContentLoaded', () => {
             name: formData.get('name'),
             whatsapp: formData.get('whatsapp'),
         };
-        showProductsPage();
+
+        if (checkoutAfterLogin) {
+            checkoutAfterLogin = false; // Reset the flag
+            showProductsPage(); // Return to the main view
+            performCheckout(); // Now, finalize the order
+        } else {
+            showProductsPage(); // Normal login, just go to products
+        }
     });
 
     function showProductsPage() {
         showPage(productsPage);
-        appHeader.classList.remove('hidden');
         renderProducts();
+    }
+
+    // --- CHECKOUT ---
+    function performCheckout() {
+        if (cart.length === 0 || !currentUser) return;
+        
+        // 1. Create and save the order
+        const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+        const newOrder = {
+            id: nextOrderId++,
+            customer: { ...currentUser },
+            items: JSON.parse(JSON.stringify(cart)), // Deep copy of cart
+            total: total,
+            status: 'pending'
+        };
+        orders.push(newOrder);
+        
+        // 2. Prepare WhatsApp message
+        const VENDEDOR_WHATSAPP = "5519981917697";
+        let pedidoText = cart.map(item => `- ${item.quantity} ${item.unit} de ${item.name}`).join('\n');
+        
+        const mensagem = `Olá! Gostaria de fazer um pedido pelo site. 😊
+
+Meu nome: ${currentUser.name}
+
+Meu pedido:
+${pedidoText}
+
+Valor Total: R$ ${total.toFixed(2).replace('.', ',')}
+
+Aguardo as instruções para pagamento e entrega. Obrigado!`;
+
+        const whatsappUrl = `https://wa.me/${VENDEDOR_WHATSAPP}?text=${encodeURIComponent(mensagem)}`;
+        
+        // 3. Clean cart and redirect
+        cart = [];
+        updateCart();
+        window.open(whatsappUrl, '_blank');
     }
 
     // --- PRODUCT RENDERING ---
@@ -338,41 +388,16 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     checkoutButton.addEventListener('click', () => {
-        if (cart.length === 0 || !currentUser) return;
-        
-        // 1. Create and save the order
-        const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-        const newOrder = {
-            id: nextOrderId++,
-            customer: { ...currentUser },
-            items: JSON.parse(JSON.stringify(cart)), // Deep copy of cart
-            total: total,
-            status: 'pending'
-        };
-        orders.push(newOrder);
-        
-        // 2. Prepare WhatsApp message
-        const VENDEDOR_WHATSAPP = "5519981917697";
-        let pedidoText = cart.map(item => `- ${item.quantity} ${item.unit} de ${item.name}`).join('\n');
-        
-        const mensagem = `Olá! Gostaria de fazer um pedido pelo site. 😊
+        // If user is not logged in, show the login page
+        if (!currentUser) {
+            checkoutAfterLogin = true; // Set flag to indicate checkout is pending login
+            toggleCart(); // Close the cart
+            showPage(authPage);
+            return; // Stop execution here
+        }
 
-Meu nome: ${currentUser.name}
-
-Meu pedido:
-${pedidoText}
-
-Valor Total: R$ ${total.toFixed(2).replace('.', ',')}
-
-Aguardo as instruções para pagamento e entrega. Obrigado!`;
-
-        const whatsappUrl = `https://wa.me/${VENDEDOR_WHATSAPP}?text=${encodeURIComponent(mensagem)}`;
-        
-        // 3. Clean cart and redirect
-        cart = [];
-        updateCart();
-        toggleCart();
-        window.open(whatsappUrl, '_blank');
+        // If user is already logged in, proceed directly to checkout
+        performCheckout();
     });
     
     orderList.addEventListener('click', (e) => {
@@ -383,6 +408,14 @@ Aguardo as instruções para pagamento e entrega. Obrigado!`;
             handleAdminAction(orderId, action);
         }
     });
+
+    // --- INITIALIZATION ---
+    function initializeApp() {
+        // Start on the products page instead of auth page
+        showProductsPage();
+    }
+
+    initializeApp();
 
 });
 
