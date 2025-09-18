@@ -1,23 +1,37 @@
 document.addEventListener('DOMContentLoaded', () => {
 
     // --- FIREBASE CONFIGURATION ---
-    // A configuração é carregada pelo arquivo config.js, que deve ser incluído no HTML antes deste script.
-    // A variável 'firebaseConfig' deve estar disponível globalmente.
-
-    // Initialize Firebase
+    // A configuração é carregada pelo arquivo config.js
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore(); // Conexão com o banco de dados Firestore
+    const auth = firebase.auth(); // Conexão com o Firebase Authentication
 
     // --- STATE MANAGEMENT ---
     let currentUser = null; 
     let cart = [];
     let products = []; // Será carregado do Firebase
+    let unsubscribeOrders = null; // Para desligar o listener de pedidos
+    let checkoutAfterLogin = false; // Flag para continuar a compra após o login
     
     // --- DOM ELEMENTS ---
-    const authPage = document.getElementById('auth-page');
+    const loginPage = document.getElementById('login-page');
+    const signupPage = document.getElementById('signup-page');
     const productsPage = document.getElementById('products-page');
     const adminPage = document.getElementById('admin-page');
-    const authForm = document.getElementById('auth-form');
+    
+    const loginForm = document.getElementById('login-form');
+    const signupForm = document.getElementById('signup-form');
+    
+    const loggedInView = document.getElementById('logged-in-view');
+    const loggedOutView = document.getElementById('logged-out-view');
+    const welcomeMessage = document.getElementById('welcome-message');
+    const logoutButton = document.getElementById('logout-button');
+    const loginLink = document.getElementById('login-link');
+    const signupLink = document.getElementById('signup-link');
+    
+    const toSignupLink = document.getElementById('to-signup-link');
+    const toLoginLink = document.getElementById('to-login-link');
+
     const appHeader = document.getElementById('app-header');
     const productGrid = document.getElementById('product-grid');
     const orderList = document.getElementById('order-list');
@@ -40,47 +54,86 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- NAVIGATION ---
     function showPage(pageToShow) {
-        [authPage, productsPage, adminPage].forEach(page => page.classList.add('hidden'));
+        [loginPage, signupPage, productsPage, adminPage].forEach(page => page.classList.add('hidden'));
         appHeader.classList.add('hidden');
-        if (pageToShow !== authPage) {
+        
+        if (pageToShow !== loginPage && pageToShow !== signupPage) {
             appHeader.classList.remove('hidden');
         }
         pageToShow.classList.remove('hidden');
     }
 
-    adminLink.addEventListener('click', (e) => {
-        e.preventDefault();
-        showPage(adminPage);
-        renderAdminPanel(); 
+    // --- AUTHENTICATION STATE CHANGE ---
+    auth.onAuthStateChanged(async (user) => {
+        if (user) {
+            // Usuário está logado
+            const userDoc = await db.collection('users').doc(user.uid).get();
+            if (userDoc.exists) {
+                currentUser = { uid: user.uid, email: user.email, ...userDoc.data() };
+                welcomeMessage.textContent = `Olá, ${currentUser.name}!`;
+            } else {
+                currentUser = { uid: user.uid, email: user.email, name: 'Usuário' };
+                welcomeMessage.textContent = `Olá!`;
+            }
+            loggedInView.classList.remove('hidden');
+            loggedOutView.classList.add('hidden');
+            
+            if (checkoutAfterLogin) {
+                checkoutAfterLogin = false;
+                showPage(productsPage);
+                await performCheckout();
+            }
+        } else {
+            // Usuário está deslogado
+            currentUser = null;
+            loggedInView.classList.add('hidden');
+            loggedOutView.classList.remove('hidden');
+        }
     });
 
-    homeLink.addEventListener('click', (e) => {
+
+    // --- AUTHENTICATION ACTIONS ---
+    signupForm.addEventListener('submit', async (e) => {
         e.preventDefault();
+        const name = signupForm.name.value;
+        const whatsapp = signupForm.whatsapp.value;
+        const email = signupForm.email.value;
+        const password = signupForm.password.value;
+
+        try {
+            const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+            await db.collection('users').doc(userCredential.user.uid).set({
+                name: name,
+                whatsapp: whatsapp
+            });
+            signupForm.reset();
+            showPage(productsPage);
+        } catch (error) {
+            showAlert('Erro no Cadastro', error.message);
+        }
+    });
+
+    loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = loginForm.email.value;
+        const password = loginForm.password.value;
+
+        try {
+            await auth.signInWithEmailAndPassword(email, password);
+            loginForm.reset();
+            if (!checkoutAfterLogin) {
+                showPage(productsPage);
+            }
+        } catch (error) {
+            showAlert('Erro no Login', error.message);
+        }
+    });
+
+    logoutButton.addEventListener('click', async () => {
+        await auth.signOut();
         showPage(productsPage);
     });
-
-    // --- ALERT MODAL ---
-    function showAlert(title, message) {
-        alertTitle.textContent = title;
-        alertMessage.textContent = message;
-        alertModal.classList.remove('hidden');
-    }
-    closeAlertModal.addEventListener('click', () => {
-        alertModal.classList.add('hidden');
-    });
-
-    // --- AUTHENTICATION ---
-    authForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const formData = new FormData(authForm);
-        currentUser = {
-            name: formData.get('name'),
-            whatsapp: formData.get('whatsapp'),
-        };
-        showPage(productsPage);
-        performCheckout();
-    });
-
+    
     // --- CHECKOUT ---
     async function performCheckout() {
         if (cart.length === 0 || !currentUser) return;
@@ -89,14 +142,18 @@ document.addEventListener('DOMContentLoaded', () => {
         
         try {
             await db.collection('orders').add({
-                customer: { ...currentUser },
+                customer: { 
+                    uid: currentUser.uid,
+                    name: currentUser.name,
+                    whatsapp: currentUser.whatsapp
+                },
                 items: JSON.parse(JSON.stringify(cart)),
                 total: total,
                 status: 'pending',
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
 
-            const VENDEDOR_WHATSAPP = "5519981917697"; // Número de exemplo
+            const VENDEDOR_WHATSAPP = "5519981917697";
             let pedidoText = cart.map(item => `- ${item.quantity} ${item.unit} de ${item.name}`).join('\n');
             const mensagem = `Olá! Gostaria de fazer um pedido pelo site. 😊
 
@@ -119,6 +176,24 @@ Aguardo as instruções para pagamento e entrega. Obrigado!`;
             showAlert('Erro', 'Não foi possível registrar seu pedido. Tente novamente.');
         }
     }
+    
+    // --- NAVIGATION LINKS ---
+    adminLink.addEventListener('click', (e) => { e.preventDefault(); showPage(adminPage); renderAdminPanel(); });
+    homeLink.addEventListener('click', (e) => { e.preventDefault(); showPage(productsPage); });
+    loginLink.addEventListener('click', (e) => { e.preventDefault(); showPage(loginPage); });
+    signupLink.addEventListener('click', (e) => { e.preventDefault(); showPage(signupPage); });
+    toSignupLink.addEventListener('click', (e) => { e.preventDefault(); showPage(signupPage); });
+    toLoginLink.addEventListener('click', (e) => { e.preventDefault(); showPage(loginPage); });
+
+    // --- ALERT MODAL ---
+    function showAlert(title, message) {
+        alertTitle.textContent = title;
+        alertMessage.textContent = message;
+        alertModal.classList.remove('hidden');
+    }
+    closeAlertModal.addEventListener('click', () => {
+        alertModal.classList.add('hidden');
+    });
 
     // --- PRODUCT RENDERING ---
     async function fetchAndRenderProducts() {
@@ -154,7 +229,7 @@ Aguardo as instruções para pagamento e entrega. Obrigado!`;
             productGrid.innerHTML = `<p class="text-red-500">Não foi possível carregar os produtos. Verifique a conexão com o Firebase.</p>`;
         }
     }
-
+    
     // --- CART LOGIC ---
     function toggleCart() {
         if (cartSidebar.classList.contains('hidden')) {
@@ -246,11 +321,12 @@ Aguardo as instruções para pagamento e entrega. Obrigado!`;
         cartItemCount.classList.toggle('hidden', cart.length === 0);
     }
 
-
     // --- ADMIN PANEL ---
     function renderAdminPanel() {
+        if (unsubscribeOrders) unsubscribeOrders(); 
+
         orderList.innerHTML = '<p class="text-center text-slate-500">Carregando pedidos...</p>';
-        db.collection('orders').orderBy('createdAt', 'desc')
+        unsubscribeOrders = db.collection('orders').orderBy('createdAt', 'desc')
           .onSnapshot(snapshot => {
             orderList.innerHTML = '';
             let totalSales = 0;
@@ -272,17 +348,8 @@ Aguardo as instruções para pagamento e entrega. Obrigado!`;
                     </li>
                 `).join('');
                 
-                const statusClasses = {
-                    pending: 'bg-yellow-100 text-yellow-800',
-                    completed: 'bg-green-100 text-green-800',
-                    cancelled: 'bg-red-100 text-red-800'
-                };
-                
-                const statusText = {
-                    pending: 'Pendente',
-                    completed: 'Concluído',
-                    cancelled: 'Cancelado'
-                }
+                const statusClasses = { pending: 'bg-yellow-100 text-yellow-800', completed: 'bg-green-100 text-green-800', cancelled: 'bg-red-100 text-red-800' };
+                const statusText = { pending: 'Pendente', completed: 'Concluído', cancelled: 'Cancelado' };
 
                 orderCard.innerHTML = `
                     <div class="flex justify-between items-start">
@@ -294,12 +361,8 @@ Aguardo as instruções para pagamento e entrega. Obrigado!`;
                         </div>
                         <span class="px-2 py-1 text-xs font-semibold rounded-full ${statusClasses[order.status]}">${statusText[order.status]}</span>
                     </div>
-                    <hr class="my-4">
-                    <ul class="space-y-2 text-sm">${itemsHtml}</ul>
-                    <hr class="my-4">
-                    <div class="text-right font-bold">
-                        Total: R$ ${order.total.toFixed(2).replace('.',',')}
-                    </div>
+                    <hr class="my-4"><ul class="space-y-2 text-sm">${itemsHtml}</ul><hr class="my-4">
+                    <div class="text-right font-bold">Total: R$ ${order.total.toFixed(2).replace('.',',')}</div>
                     <div class="mt-4 flex gap-4 justify-end" ${order.status !== 'pending' ? 'style="display:none;"' : ''}>
                         <button data-order-id="${order.id}" data-action="cancel" class="admin-action-btn bg-red-100 text-red-700 hover:bg-red-200 font-semibold py-2 px-4 rounded-lg">Venda Não Realizada</button>
                         <button data-order-id="${order.id}" data-action="complete" class="admin-action-btn bg-green-100 text-green-700 hover:bg-green-200 font-semibold py-2 px-4 rounded-lg">Venda Realizada</button>
@@ -307,9 +370,7 @@ Aguardo as instruções para pagamento e entrega. Obrigado!`;
                 `;
                 orderList.appendChild(orderCard);
 
-                if (order.status === 'completed') {
-                    totalSales += order.total;
-                }
+                if (order.status === 'completed') totalSales += order.total;
             });
             updateSalesSummary(totalSales);
         }, error => {
@@ -340,22 +401,17 @@ Aguardo as instruções para pagamento e entrega. Obrigado!`;
                     if (!orderDoc.exists) throw "Pedido não encontrado!";
                     
                     const orderData = orderDoc.data();
-
                     for (const item of orderData.items) {
                         const productRef = db.collection('products').doc(item.id);
                         const productDoc = await transaction.get(productRef);
-                        if (!productDoc.exists) throw `Produto ${item.name} não encontrado no banco de dados!`;
-                        if (productDoc.data().stock < item.quantity) {
-                            throw `Estoque de ${item.name} insuficiente!`;
-                        }
+                        if (!productDoc.exists) throw `Produto ${item.name} não encontrado!`;
+                        if (productDoc.data().stock < item.quantity) throw `Estoque de ${item.name} insuficiente!`;
                     }
-
                     for (const item of orderData.items) {
                         const productRef = db.collection('products').doc(item.id);
                         const newStock = firebase.firestore.FieldValue.increment(-item.quantity);
                         transaction.update(productRef, { stock: newStock });
                     }
-
                     transaction.update(orderRef, { status: 'completed' });
                 });
             } catch (error) {
@@ -364,7 +420,6 @@ Aguardo as instruções para pagamento e entrega. Obrigado!`;
             }
         }
     }
-
 
     // --- EVENT LISTENERS ---
     cartButton.addEventListener('click', toggleCart);
@@ -392,8 +447,7 @@ Aguardo as instruções para pagamento e entrega. Obrigado!`;
     });
 
     cartItemsList.addEventListener('click', (e) => {
-        const target = e.target;
-        const button = target.closest('.quantity-change-btn, .remove-item-btn');
+        const button = e.target.closest('.quantity-change-btn, .remove-item-btn');
         if (button) {
             const productId = button.dataset.productId;
             const item = cart.find(i => i.id === productId);
@@ -402,19 +456,20 @@ Aguardo as instruções para pagamento e entrega. Obrigado!`;
             if (button.classList.contains('quantity-change-btn')) {
                 const newQuantity = button.dataset.action === 'increase' ? item.quantity + 1 : item.quantity - 1;
                 updateCartItemQuantity(productId, newQuantity);
-            } else { // remove-item-btn
+            } else {
                 updateCartItemQuantity(productId, 0);
             }
         }
     });
     
     checkoutButton.addEventListener('click', () => {
-        if (!currentUser) {
+        if (currentUser) {
+            performCheckout();
+        } else {
+            checkoutAfterLogin = true;
             toggleCart();
-            showPage(authPage);
-            return;
+            showPage(loginPage);
         }
-        performCheckout();
     });
     
     orderList.addEventListener('click', (e) => {
@@ -434,4 +489,3 @@ Aguardo as instruções para pagamento e entrega. Obrigado!`;
 
     initializeApp();
 });
-
