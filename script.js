@@ -1,21 +1,17 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // --- STATE MANAGEMENT ---
-    let currentUser = null;
-    let cart = [];
-    let orders = [];
-    let nextOrderId = 1;
-    let checkoutAfterLogin = false; // Flag to handle checkout after login
 
-    const products = [
-        { id: 1, name: 'Alface Crespa', price: 3.50, unit: 'unidade', image: 'https://52586.cdn.lojaquevende.com.br/static/52586/sku/verduras-Alface-Crespa-1586828067472.jpg', stock: 50 },
-        { id: 2, name: 'Tomate Italiano', price: 8.99, unit: 'kg', image: 'https://www.infoescola.com/wp-content/uploads/2011/01/tomate_345187874.jpg', stock: 30 },
-        { id: 3, name: 'Cebola Branca', price: 5.49, unit: 'kg', image: 'https://www.hortifrutiorganico.com.br/36-large_default/cebola-organica-500g.jpg', stock: 40 },
-        { id: 4, name: 'Batata Inglesa', price: 4.99, unit: 'kg', image: 'https://mercadoorganico.com/6428-large_default/batata-inglesa-organica-500g-osm.jpg', stock: 60 },
-        { id: 5, name: 'Cenoura', price: 4.50, unit: 'kg', image: 'https://www.maisquitanda.com.br/image/cache/1-verduras-legumes/cenoura%20rama-800x800.png', stock: 35 },
-        { id: 6, name: 'Maçã Fuji', price: 9.90, unit: 'kg', image: 'https://acdn-us.mitiendanube.com/stores/002/296/660/products/fuji1-0d7cea47617b6b720216606777783880-1024-1024.jpg', stock: 25 },
-        { id: 7, name: 'Banana Nanica', price: 6.50, unit: 'dúzia', image: 'https://vallefrutas.com.br/wp-content/uploads/banana-nanica.png', stock: 20 },
-        { id: 8, name: 'Cheiro Verde', price: 2.50, unit: 'maço', image: 'https://mondiniplantas.cdn.magazord.com.br/img/2021/07/produto/1210/salsa-lisa.jpg', stock: 45 },
-    ];
+    // --- FIREBASE CONFIGURATION ---
+    // A configuração é carregada pelo arquivo config.js, que deve ser incluído no HTML antes deste script.
+    // A variável 'firebaseConfig' deve estar disponível globalmente.
+
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore(); // Conexão com o banco de dados Firestore
+
+    // --- STATE MANAGEMENT ---
+    let currentUser = null; 
+    let cart = [];
+    let products = []; // Será carregado do Firebase
     
     // --- DOM ELEMENTS ---
     const authPage = document.getElementById('auth-page');
@@ -26,10 +22,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const productGrid = document.getElementById('product-grid');
     const orderList = document.getElementById('order-list');
     const salesSummary = document.getElementById('sales-summary');
-    
     const homeLink = document.getElementById('home-link');
     const adminLink = document.getElementById('admin-link');
-    
     const cartButton = document.getElementById('cart-button');
     const closeCartButton = document.getElementById('close-cart-button');
     const cartSidebar = document.getElementById('cart-sidebar');
@@ -39,7 +33,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const cartTotalPrice = document.getElementById('cart-total-price');
     const checkoutButton = document.getElementById('checkout-button');
     const cartItemCount = document.getElementById('cart-item-count');
-    
     const alertModal = document.getElementById('alert-modal');
     const alertTitle = document.getElementById('alert-title');
     const alertMessage = document.getElementById('alert-message');
@@ -48,8 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- NAVIGATION ---
     function showPage(pageToShow) {
         [authPage, productsPage, adminPage].forEach(page => page.classList.add('hidden'));
-        appHeader.classList.add('hidden'); // Hide header by default
-        
+        appHeader.classList.add('hidden');
         if (pageToShow !== authPage) {
             appHeader.classList.remove('hidden');
         }
@@ -58,8 +50,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     adminLink.addEventListener('click', (e) => {
         e.preventDefault();
-        renderAdminPanel();
         showPage(adminPage);
+        renderAdminPanel(); 
     });
 
     homeLink.addEventListener('click', (e) => {
@@ -85,41 +77,28 @@ document.addEventListener('DOMContentLoaded', () => {
             name: formData.get('name'),
             whatsapp: formData.get('whatsapp'),
         };
-
-        if (checkoutAfterLogin) {
-            checkoutAfterLogin = false; // Reset the flag
-            showProductsPage(); // Return to the main view
-            performCheckout(); // Now, finalize the order
-        } else {
-            showProductsPage(); // Normal login, just go to products
-        }
+        showPage(productsPage);
+        performCheckout();
     });
 
-    function showProductsPage() {
-        showPage(productsPage);
-        renderProducts();
-    }
-
     // --- CHECKOUT ---
-    function performCheckout() {
+    async function performCheckout() {
         if (cart.length === 0 || !currentUser) return;
-        
-        // 1. Create and save the order
+
         const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-        const newOrder = {
-            id: nextOrderId++,
-            customer: { ...currentUser },
-            items: JSON.parse(JSON.stringify(cart)), // Deep copy of cart
-            total: total,
-            status: 'pending'
-        };
-        orders.push(newOrder);
         
-        // 2. Prepare WhatsApp message
-        const VENDEDOR_WHATSAPP = "5519981917697";
-        let pedidoText = cart.map(item => `- ${item.quantity} ${item.unit} de ${item.name}`).join('\n');
-        
-        const mensagem = `Olá! Gostaria de fazer um pedido pelo site. 😊
+        try {
+            await db.collection('orders').add({
+                customer: { ...currentUser },
+                items: JSON.parse(JSON.stringify(cart)),
+                total: total,
+                status: 'pending',
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+
+            const VENDEDOR_WHATSAPP = "5519981917697"; // Número de exemplo
+            let pedidoText = cart.map(item => `- ${item.quantity} ${item.unit} de ${item.name}`).join('\n');
+            const mensagem = `Olá! Gostaria de fazer um pedido pelo site. 😊
 
 Meu nome: ${currentUser.name}
 
@@ -129,40 +108,51 @@ ${pedidoText}
 Valor Total: R$ ${total.toFixed(2).replace('.', ',')}
 
 Aguardo as instruções para pagamento e entrega. Obrigado!`;
+            const whatsappUrl = `https://wa.me/${VENDEDOR_WHATSAPP}?text=${encodeURIComponent(mensagem)}`;
 
-        const whatsappUrl = `https://wa.me/${VENDEDOR_WHATSAPP}?text=${encodeURIComponent(mensagem)}`;
-        
-        // 3. Clean cart and redirect
-        cart = [];
-        updateCart();
-        window.open(whatsappUrl, '_blank');
+            cart = [];
+            updateCart();
+            window.open(whatsappUrl, '_blank');
+
+        } catch (error) {
+            console.error("Erro ao salvar o pedido: ", error);
+            showAlert('Erro', 'Não foi possível registrar seu pedido. Tente novamente.');
+        }
     }
 
     // --- PRODUCT RENDERING ---
-    function renderProducts() {
-        productGrid.innerHTML = '';
-        products.forEach(product => {
-            const card = document.createElement('div');
-            card.className = 'bg-white rounded-lg shadow-md overflow-hidden transition-transform transform hover:-translate-y-1';
-            const stockInfo = product.stock > 0 ? `${product.stock} em estoque` : 'Sem estoque';
-            const buttonDisabled = product.stock <= 0 ? 'disabled' : '';
-            const buttonClasses = product.stock <= 0 ? 'bg-slate-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700';
+    async function fetchAndRenderProducts() {
+        try {
+            const snapshot = await db.collection('products').get();
+            products = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            
+            productGrid.innerHTML = '';
+            products.forEach(product => {
+                const card = document.createElement('div');
+                card.className = 'bg-white rounded-lg shadow-md overflow-hidden transition-transform transform hover:-translate-y-1';
+                const stockInfo = product.stock > 0 ? `${product.stock} em estoque` : 'Sem estoque';
+                const buttonDisabled = product.stock <= 0 ? 'disabled' : '';
+                const buttonClasses = product.stock <= 0 ? 'bg-slate-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700';
 
-            card.innerHTML = `
-                <img src="${product.image}" alt="${product.name}" class="w-full h-48 object-cover">
-                <div class="p-4">
-                    <h3 class="text-lg font-semibold">${product.name}</h3>
-                    <div class="flex justify-between items-center">
-                        <p class="text-slate-600">R$ ${product.price.toFixed(2).replace('.', ',')} / ${product.unit}</p>
-                        <p class="text-sm font-medium text-slate-500">${stockInfo}</p>
+                card.innerHTML = `
+                    <img src="${product.image}" alt="${product.name}" class="w-full h-48 object-cover">
+                    <div class="p-4">
+                        <h3 class="text-lg font-semibold">${product.name}</h3>
+                        <div class="flex justify-between items-center">
+                            <p class="text-slate-600">R$ ${product.price.toFixed(2).replace('.', ',')} / ${product.unit}</p>
+                            <p class="text-sm font-medium text-slate-500">${stockInfo}</p>
+                        </div>
+                        <button data-product-id="${product.id}" class="add-to-cart-btn mt-4 w-full text-white py-2 rounded-lg font-semibold transition-colors ${buttonClasses}" ${buttonDisabled}>
+                            ${product.stock > 0 ? 'Adicionar ao Carrinho' : 'Indisponível'}
+                        </button>
                     </div>
-                    <button data-product-id="${product.id}" class="add-to-cart-btn mt-4 w-full text-white py-2 rounded-lg font-semibold transition-colors ${buttonClasses}" ${buttonDisabled}>
-                        ${product.stock > 0 ? 'Adicionar ao Carrinho' : 'Indisponível'}
-                    </button>
-                </div>
-            `;
-            productGrid.appendChild(card);
-        });
+                `;
+                productGrid.appendChild(card);
+            });
+        } catch (error) {
+            console.error("Erro ao carregar produtos: ", error);
+            productGrid.innerHTML = `<p class="text-red-500">Não foi possível carregar os produtos. Verifique a conexão com o Firebase.</p>`;
+        }
     }
 
     // --- CART LOGIC ---
@@ -178,6 +168,8 @@ Aguardo as instruções para pagamento e entrega. Obrigado!`;
 
     function addToCart(productId) {
         const product = products.find(p => p.id === productId);
+        if (!product) return;
+        
         const existingItem = cart.find(item => item.id === productId);
 
         if (existingItem) {
@@ -197,17 +189,16 @@ Aguardo as instruções para pagamento e entrega. Obrigado!`;
     function updateCartItemQuantity(productId, newQuantity) {
         const itemInCart = cart.find(item => item.id === productId);
         const product = products.find(p => p.id === productId);
+        if (!itemInCart || !product) return;
 
-        if (itemInCart) {
-            if (newQuantity <= 0) {
-                cart = cart.filter(item => item.id !== productId);
-            } else if (newQuantity > product.stock) {
-                showAlert('Estoque Insuficiente', `Apenas ${product.stock} unidades de ${product.name} estão disponíveis.`);
-                itemInCart.quantity = product.stock;
-            }
-            else {
-                itemInCart.quantity = newQuantity;
-            }
+        if (newQuantity <= 0) {
+            cart = cart.filter(item => item.id !== productId);
+        } else if (newQuantity > product.stock) {
+            showAlert('Estoque Insuficiente', `Apenas ${product.stock} unidades de ${product.name} estão disponíveis.`);
+            itemInCart.quantity = product.stock;
+        }
+        else {
+            itemInCart.quantity = newQuantity;
         }
         updateCart();
     }
@@ -255,15 +246,22 @@ Aguardo as instruções para pagamento e entrega. Obrigado!`;
         cartItemCount.classList.toggle('hidden', cart.length === 0);
     }
 
+
     // --- ADMIN PANEL ---
     function renderAdminPanel() {
-        orderList.innerHTML = '';
-        let totalSales = 0;
+        orderList.innerHTML = '<p class="text-center text-slate-500">Carregando pedidos...</p>';
+        db.collection('orders').orderBy('createdAt', 'desc')
+          .onSnapshot(snapshot => {
+            orderList.innerHTML = '';
+            let totalSales = 0;
+            if (snapshot.empty) {
+                orderList.innerHTML = `<p class="text-center text-slate-500">Nenhum pedido registrado ainda.</p>`;
+                updateSalesSummary(0);
+                return;
+            }
 
-        if (orders.length === 0) {
-            orderList.innerHTML = `<p class="text-center text-slate-500">Nenhum pedido registrado ainda.</p>`;
-        } else {
-            orders.forEach(order => {
+            snapshot.forEach(doc => {
+                const order = { id: doc.id, ...doc.data() };
                 const orderCard = document.createElement('div');
                 orderCard.className = 'bg-white rounded-lg shadow-md p-6';
 
@@ -275,19 +273,26 @@ Aguardo as instruções para pagamento e entrega. Obrigado!`;
                 `).join('');
                 
                 const statusClasses = {
-                    pending: 'status-pending',
-                    completed: 'status-completed',
-                    cancelled: 'status-cancelled'
+                    pending: 'bg-yellow-100 text-yellow-800',
+                    completed: 'bg-green-100 text-green-800',
+                    cancelled: 'bg-red-100 text-red-800'
                 };
+                
+                const statusText = {
+                    pending: 'Pendente',
+                    completed: 'Concluído',
+                    cancelled: 'Cancelado'
+                }
 
                 orderCard.innerHTML = `
                     <div class="flex justify-between items-start">
                         <div>
-                            <h3 class="font-bold text-lg">Pedido #${String(order.id).padStart(4, '0')}</h3>
+                            <h3 class="font-bold text-lg">Pedido #${String(doc.id).substring(0, 5).toUpperCase()}</h3>
                             <p class="text-sm text-slate-600">Cliente: ${order.customer.name}</p>
                             <p class="text-sm text-slate-600">WhatsApp: ${order.customer.whatsapp}</p>
+                            <p class="text-xs text-slate-400">Data: ${order.createdAt ? new Date(order.createdAt.seconds * 1000).toLocaleString('pt-BR') : 'N/A'}</p>
                         </div>
-                        <span class="status-badge ${statusClasses[order.status]}">${order.status}</span>
+                        <span class="px-2 py-1 text-xs font-semibold rounded-full ${statusClasses[order.status]}">${statusText[order.status]}</span>
                     </div>
                     <hr class="my-4">
                     <ul class="space-y-2 text-sm">${itemsHtml}</ul>
@@ -301,53 +306,63 @@ Aguardo as instruções para pagamento e entrega. Obrigado!`;
                     </div>
                 `;
                 orderList.appendChild(orderCard);
-                
+
                 if (order.status === 'completed') {
                     totalSales += order.total;
                 }
             });
-        }
-        
+            updateSalesSummary(totalSales);
+        }, error => {
+            console.error("Erro ao buscar pedidos: ", error);
+            orderList.innerHTML = `<p class="text-center text-red-500">Erro ao carregar pedidos.</p>`;
+        });
+    }
+    
+    function updateSalesSummary(total) {
         salesSummary.innerHTML = `
             <p class="text-lg font-medium text-slate-700">Total de Vendas Válidas</p>
-            <p class="text-3xl font-bold text-green-600">R$ ${totalSales.toFixed(2).replace('.',',')}</p>
+            <p class="text-3xl font-bold text-green-600">R$ ${total.toFixed(2).replace('.',',')}</p>
         `;
     }
     
-    function handleAdminAction(orderId, action) {
-        const order = orders.find(o => o.id === orderId);
-        if (!order) return;
-
-        if (action === 'complete') {
-            // Check stock before completing
-            let canFulfill = true;
-            let outOfStockItem = null;
-            for (const item of order.items) {
-                const productInStock = products.find(p => p.id === item.id);
-                if (productInStock.stock < item.quantity) {
-                    canFulfill = false;
-                    outOfStockItem = item;
-                    break;
-                }
-            }
-            
-            if (canFulfill) {
-                // Decrease stock
-                order.items.forEach(item => {
-                    const productInStock = products.find(p => p.id === item.id);
-                    productInStock.stock -= item.quantity;
-                });
-                order.status = 'completed';
-                renderProducts(); // Re-render products to show updated stock
-            } else {
-                 showAlert('Estoque Insuficiente!', `Não foi possível confirmar a venda. Estoque de "${outOfStockItem.name}" é insuficiente.`);
-            }
-
-        } else if (action === 'cancel') {
-            order.status = 'cancelled';
+    async function handleAdminAction(orderId, action) {
+        const orderRef = db.collection('orders').doc(orderId);
+        
+        if (action === 'cancel') {
+            await orderRef.update({ status: 'cancelled' });
+            return;
         }
 
-        renderAdminPanel();
+        if (action === 'complete') {
+            try {
+                await db.runTransaction(async (transaction) => {
+                    const orderDoc = await transaction.get(orderRef);
+                    if (!orderDoc.exists) throw "Pedido não encontrado!";
+                    
+                    const orderData = orderDoc.data();
+
+                    for (const item of orderData.items) {
+                        const productRef = db.collection('products').doc(item.id);
+                        const productDoc = await transaction.get(productRef);
+                        if (!productDoc.exists) throw `Produto ${item.name} não encontrado no banco de dados!`;
+                        if (productDoc.data().stock < item.quantity) {
+                            throw `Estoque de ${item.name} insuficiente!`;
+                        }
+                    }
+
+                    for (const item of orderData.items) {
+                        const productRef = db.collection('products').doc(item.id);
+                        const newStock = firebase.firestore.FieldValue.increment(-item.quantity);
+                        transaction.update(productRef, { stock: newStock });
+                    }
+
+                    transaction.update(orderRef, { status: 'completed' });
+                });
+            } catch (error) {
+                console.error("Erro na transação: ", error);
+                showAlert("Erro de Estoque", String(error));
+            }
+        }
     }
 
 
@@ -357,29 +372,35 @@ Aguardo as instruções para pagamento e entrega. Obrigado!`;
     cartSidebar.addEventListener('click', (e) => (e.target === cartSidebar) && toggleCart());
 
     productGrid.addEventListener('click', (e) => {
-        if (e.target.classList.contains('add-to-cart-btn')) {
-            const productId = parseInt(e.target.dataset.productId);
+        const button = e.target.closest('.add-to-cart-btn');
+        if (button) {
+            const productId = button.dataset.productId;
             addToCart(productId);
             
-            e.target.textContent = 'Adicionado! ✓';
-            e.target.classList.remove('bg-green-600', 'hover:bg-green-700');
-            e.target.classList.add('bg-orange-500', 'cursor-default');
+            button.textContent = 'Adicionado! ✓';
+            button.classList.remove('bg-green-600', 'hover:bg-green-700');
+            button.classList.add('bg-orange-500', 'cursor-default');
             setTimeout(() => {
-                e.target.textContent = 'Adicionar ao Carrinho';
-                e.target.classList.remove('bg-orange-500', 'cursor-default');
-                e.target.classList.add('bg-green-600', 'hover:bg-green-700');
+                const product = products.find(p => p.id === productId);
+                if (product && product.stock > 0){
+                    button.textContent = 'Adicionar ao Carrinho';
+                    button.classList.remove('bg-orange-500', 'cursor-default');
+                    button.classList.add('bg-green-600', 'hover:bg-green-700');
+                }
             }, 1500);
         }
     });
 
     cartItemsList.addEventListener('click', (e) => {
         const target = e.target;
-        if (target.matches('.quantity-change-btn, .remove-item-btn')) {
-            const productId = parseInt(target.dataset.productId);
+        const button = target.closest('.quantity-change-btn, .remove-item-btn');
+        if (button) {
+            const productId = button.dataset.productId;
             const item = cart.find(i => i.id === productId);
-            
-            if (target.classList.contains('quantity-change-btn')) {
-                const newQuantity = target.dataset.action === 'increase' ? item.quantity + 1 : item.quantity - 1;
+            if (!item) return;
+
+            if (button.classList.contains('quantity-change-btn')) {
+                const newQuantity = button.dataset.action === 'increase' ? item.quantity + 1 : item.quantity - 1;
                 updateCartItemQuantity(productId, newQuantity);
             } else { // remove-item-btn
                 updateCartItemQuantity(productId, 0);
@@ -388,22 +409,18 @@ Aguardo as instruções para pagamento e entrega. Obrigado!`;
     });
     
     checkoutButton.addEventListener('click', () => {
-        // If user is not logged in, show the login page
         if (!currentUser) {
-            checkoutAfterLogin = true; // Set flag to indicate checkout is pending login
-            toggleCart(); // Close the cart
+            toggleCart();
             showPage(authPage);
-            return; // Stop execution here
+            return;
         }
-
-        // If user is already logged in, proceed directly to checkout
         performCheckout();
     });
     
     orderList.addEventListener('click', (e) => {
-        const target = e.target;
-        if (target.classList.contains('admin-action-btn')) {
-            const orderId = parseInt(target.dataset.orderId);
+        const target = e.target.closest('.admin-action-btn');
+        if (target) {
+            const orderId = target.dataset.orderId;
             const action = target.dataset.action;
             handleAdminAction(orderId, action);
         }
@@ -411,11 +428,10 @@ Aguardo as instruções para pagamento e entrega. Obrigado!`;
 
     // --- INITIALIZATION ---
     function initializeApp() {
-        // Start on the products page instead of auth page
-        showProductsPage();
+        showPage(productsPage);
+        fetchAndRenderProducts();
     }
 
     initializeApp();
-
 });
 
