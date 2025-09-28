@@ -21,16 +21,14 @@
             <a href="#" id="home-link" class="text-2xl font-bold text-green-700">Horta em Casa</a>
             
             <div class="flex items-center gap-4">
-                 <!-- Visão para usuário deslogado -->
                 <div id="logged-out-view" class="flex items-center gap-4">
                     <a href="#" id="login-link" class="text-slate-600 hover:text-green-700 font-medium">Entrar</a>
                     <a href="#" id="signup-link" class="bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700 transition-colors">Cadastrar</a>
                 </div>
 
-                <!-- Visão para usuário logado -->
                 <div id="logged-in-view" class="hidden flex items-center gap-4">
                     <span id="welcome-message" class="text-slate-600"></span>
-                    <a href="#" id="admin-link" class="text-slate-600 hover:text-green-700 font-medium">Gerenciamento</a>
+                    <a href="#" id="admin-link" class="hidden text-slate-600 hover:text-green-700 font-medium">Gerenciamento</a>
                     <button id="logout-button" class="text-slate-600 hover:text-red-600 font-medium">Sair</button>
                 </div>
                
@@ -106,11 +104,45 @@
         <!-- PÁGINA DE ADMINISTRAÇÃO -->
         <section id="admin-page" class="hidden">
             <div class="flex justify-between items-center mb-6">
-                <h1 class="text-3xl font-bold text-slate-800">Gerenciamento de Vendas</h1>
-                <div id="sales-summary" class="text-right">
-                    <!-- Resumo das vendas será inserido aqui -->
-                </div>
+                <h1 class="text-3xl font-bold text-slate-800">Gerenciamento</h1>
+                <div id="sales-summary" class="text-right"></div>
             </div>
+
+            <!-- Controles do Admin (Adicionar Produto) -->
+            <div id="admin-controls-container" class="hidden mb-8">
+                <button id="show-add-product-form-btn" class="bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">
+                    + Adicionar Novo Produto
+                </button>
+                <form id="add-product-form" class="hidden mt-4 p-6 bg-white rounded-lg shadow-md grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <h3 class="col-span-1 md:col-span-2 text-xl font-semibold text-slate-700">Novo Produto</h3>
+                    <div>
+                        <label for="product-name" class="block text-sm font-medium text-slate-600">Nome do Produto</label>
+                        <input type="text" id="product-name" name="product-name" required class="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500">
+                    </div>
+                     <div>
+                        <label for="product-price" class="block text-sm font-medium text-slate-600">Preço (ex: 8.99)</label>
+                        <input type="number" step="0.01" id="product-price" name="product-price" required class="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500">
+                    </div>
+                     <div>
+                        <label for="product-unit" class="block text-sm font-medium text-slate-600">Unidade (kg, unidade, dúzia)</label>
+                        <input type="text" id="product-unit" name="product-unit" required class="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500">
+                    </div>
+                     <div>
+                        <label for="product-stock" class="block text-sm font-medium text-slate-600">Estoque Inicial</label>
+                        <input type="number" id="product-stock" name="product-stock" required class="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500">
+                    </div>
+                     <div class="col-span-1 md:col-span-2">
+                        <label for="product-image" class="block text-sm font-medium text-slate-600">URL da Imagem</label>
+                        <input type="url" id="product-image" name="product-image" required class="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500">
+                    </div>
+                    <div class="col-span-1 md:col-span-2 flex justify-end gap-4">
+                        <button type="button" id="cancel-add-product-btn" class="bg-slate-100 text-slate-700 font-semibold py-2 px-4 rounded-lg hover:bg-slate-200">Cancelar</button>
+                        <button type="submit" class="bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700">Salvar Produto</button>
+                    </div>
+                </form>
+            </div>
+            
+            <h2 class="text-2xl font-bold text-slate-800 mb-4">Pedidos Recebidos</h2>
             <div id="order-list" class="space-y-6">
                 <!-- Lista de pedidos será inserida aqui -->
             </div>

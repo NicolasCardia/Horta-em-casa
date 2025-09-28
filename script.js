@@ -1,17 +1,17 @@
 document.addEventListener('DOMContentLoaded', () => {
 
-    // --- FIREBASE CONFIGURATION ---
+    // --- FIREBASE INITIALIZATION ---
     // A configuração é carregada pelo arquivo config.js
     firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore(); // Conexão com o banco de dados Firestore
-    const auth = firebase.auth(); // Conexão com o Firebase Authentication
+    const db = firebase.firestore();
+    const auth = firebase.auth();
 
     // --- STATE MANAGEMENT ---
     let currentUser = null; 
     let cart = [];
-    let products = []; // Será carregado do Firebase
-    let unsubscribeOrders = null; // Para desligar o listener de pedidos
-    let checkoutAfterLogin = false; // Flag para continuar a compra após o login
+    let products = [];
+    let unsubscribeOrders = null;
+    let checkoutAfterLogin = false;
     
     // --- DOM ELEMENTS ---
     const loginPage = document.getElementById('login-page');
@@ -52,6 +52,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const alertMessage = document.getElementById('alert-message');
     const closeAlertModal = document.getElementById('close-alert-modal');
 
+    // Admin-specific DOM elements
+    const adminControlsContainer = document.getElementById('admin-controls-container');
+    const showAddProductFormBtn = document.getElementById('show-add-product-form-btn');
+    const addProductForm = document.getElementById('add-product-form');
+    const cancelAddProductBtn = document.getElementById('cancel-add-product-btn');
+
     // --- NAVIGATION ---
     function showPage(pageToShow) {
         [loginPage, signupPage, productsPage, adminPage].forEach(page => page.classList.add('hidden'));
@@ -65,16 +71,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- AUTHENTICATION STATE CHANGE ---
     auth.onAuthStateChanged(async (user) => {
+        adminLink.classList.add('hidden');
+        adminControlsContainer.classList.add('hidden');
+
         if (user) {
-            // Usuário está logado
             const userDoc = await db.collection('users').doc(user.uid).get();
             if (userDoc.exists) {
-                currentUser = { uid: user.uid, email: user.email, ...userDoc.data() };
+                currentUser = { uid: user.uid, email: user.email, ...userDoc.data(), isAdmin: false };
                 welcomeMessage.textContent = `Olá, ${currentUser.name}!`;
             } else {
-                currentUser = { uid: user.uid, email: user.email, name: 'Usuário' };
+                currentUser = { uid: user.uid, email: user.email, name: 'Usuário', isAdmin: false };
                 welcomeMessage.textContent = `Olá!`;
             }
+
+            if (user.uid === ADMIN_UID) {
+                currentUser.isAdmin = true;
+                adminLink.classList.remove('hidden');
+                adminControlsContainer.classList.remove('hidden');
+            }
+            
             loggedInView.classList.remove('hidden');
             loggedOutView.classList.add('hidden');
             
@@ -84,7 +99,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 await performCheckout();
             }
         } else {
-            // Usuário está deslogado
             currentUser = null;
             loggedInView.classList.add('hidden');
             loggedOutView.classList.remove('hidden');
@@ -481,6 +495,46 @@ Aguardo as instruções para pagamento e entrega. Obrigado!`;
         }
     });
 
+    // Admin form listeners
+    showAddProductFormBtn.addEventListener('click', () => {
+        addProductForm.classList.remove('hidden');
+        showAddProductFormBtn.classList.add('hidden');
+    });
+
+    cancelAddProductBtn.addEventListener('click', () => {
+        addProductForm.classList.add('hidden');
+        showAddProductFormBtn.classList.remove('hidden');
+        addProductForm.reset();
+    });
+
+    addProductForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!currentUser || !currentUser.isAdmin) {
+            showAlert('Acesso Negado', 'Você não tem permissão para realizar esta ação.');
+            return;
+        }
+
+        const newProduct = {
+            name: addProductForm.querySelector('#product-name').value,
+            price: parseFloat(addProductForm.querySelector('#product-price').value),
+            unit: addProductForm.querySelector('#product-unit').value,
+            stock: parseInt(addProductForm.querySelector('#product-stock').value),
+            image: addProductForm.querySelector('#product-image').value,
+        };
+
+        try {
+            await db.collection('products').add(newProduct);
+            showAlert('Sucesso!', `Produto "${newProduct.name}" adicionado com sucesso.`);
+            addProductForm.reset();
+            addProductForm.classList.add('hidden');
+            showAddProductFormBtn.classList.remove('hidden');
+            fetchAndRenderProducts();
+        } catch (error) {
+            console.error("Erro ao adicionar produto: ", error);
+            showAlert('Erro', 'Não foi possível adicionar o produto.');
+        }
+    });
+
     // --- INITIALIZATION ---
     function initializeApp() {
         showPage(productsPage);
@@ -489,3 +543,4 @@ Aguardo as instruções para pagamento e entrega. Obrigado!`;
 
     initializeApp();
 });
+

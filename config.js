@@ -7,3 +7,6 @@ const firebaseConfig = {
         appId: "1:559286368332:web:72899b79986af43ef05ce9",
         measurementId: "G-ED9T88CXKX"
     }; 
+
+// --- CONFIGURAÇÃO DE ADMIN ---
+const ADMIN_UID = "7OENAgt8pheLgKweOQqCnJaIpf03";
