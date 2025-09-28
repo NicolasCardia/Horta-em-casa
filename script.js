@@ -1,7 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
 
     // --- FIREBASE INITIALIZATION ---
-    // A configuração é carregada pelo arquivo config.js
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
     const auth = firebase.auth();
@@ -18,20 +17,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const signupPage = document.getElementById('signup-page');
     const productsPage = document.getElementById('products-page');
     const adminPage = document.getElementById('admin-page');
-    
     const loginForm = document.getElementById('login-form');
     const signupForm = document.getElementById('signup-form');
-    
     const loggedInView = document.getElementById('logged-in-view');
     const loggedOutView = document.getElementById('logged-out-view');
     const welcomeMessage = document.getElementById('welcome-message');
     const logoutButton = document.getElementById('logout-button');
     const loginLink = document.getElementById('login-link');
     const signupLink = document.getElementById('signup-link');
-    
     const toSignupLink = document.getElementById('to-signup-link');
     const toLoginLink = document.getElementById('to-login-link');
-
     const appHeader = document.getElementById('app-header');
     const productGrid = document.getElementById('product-grid');
     const orderList = document.getElementById('order-list');
@@ -47,10 +42,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const cartTotalPrice = document.getElementById('cart-total-price');
     const checkoutButton = document.getElementById('checkout-button');
     const cartItemCount = document.getElementById('cart-item-count');
+    
     const alertModal = document.getElementById('alert-modal');
     const alertTitle = document.getElementById('alert-title');
     const alertMessage = document.getElementById('alert-message');
     const closeAlertModal = document.getElementById('close-alert-modal');
+
+    // Confirmation Modal elements
+    const confirmModal = document.getElementById('confirm-modal');
+    const confirmTitle = document.getElementById('confirm-title');
+    const confirmMessage = document.getElementById('confirm-message');
+    const confirmBtn = document.getElementById('confirm-btn');
+    const cancelBtn = document.getElementById('cancel-btn');
 
     // Admin-specific DOM elements
     const adminControlsContainer = document.getElementById('admin-controls-container');
@@ -62,7 +65,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function showPage(pageToShow) {
         [loginPage, signupPage, productsPage, adminPage].forEach(page => page.classList.add('hidden'));
         appHeader.classList.add('hidden');
-        
         if (pageToShow !== loginPage && pageToShow !== signupPage) {
             appHeader.classList.remove('hidden');
         }
@@ -73,7 +75,6 @@ document.addEventListener('DOMContentLoaded', () => {
     auth.onAuthStateChanged(async (user) => {
         adminLink.classList.add('hidden');
         adminControlsContainer.classList.add('hidden');
-
         if (user) {
             const userDoc = await db.collection('users').doc(user.uid).get();
             if (userDoc.exists) {
@@ -103,22 +104,51 @@ document.addEventListener('DOMContentLoaded', () => {
             loggedInView.classList.add('hidden');
             loggedOutView.classList.remove('hidden');
         }
+        if (products.length > 0) renderProducts();
     });
 
+    // --- MODALS (ALERT AND CONFIRM) ---
+    function showAlert(title, message) {
+        alertTitle.textContent = title;
+        alertMessage.textContent = message;
+        alertModal.classList.remove('hidden');
+    }
+    closeAlertModal.addEventListener('click', () => alertModal.classList.add('hidden'));
+
+    function showConfirm(title, message) {
+        return new Promise(resolve => {
+            confirmTitle.textContent = title;
+            confirmMessage.textContent = message;
+            confirmModal.classList.remove('hidden');
+
+            const onConfirm = () => {
+                confirmModal.classList.add('hidden');
+                confirmBtn.removeEventListener('click', onConfirm);
+                cancelBtn.removeEventListener('click', onCancel);
+                resolve(true);
+            };
+
+            const onCancel = () => {
+                confirmModal.classList.add('hidden');
+                confirmBtn.removeEventListener('click', onConfirm);
+                cancelBtn.removeEventListener('click', onCancel);
+                resolve(false);
+            };
+
+            confirmBtn.addEventListener('click', onConfirm);
+            cancelBtn.addEventListener('click', onCancel);
+        });
+    }
 
     // --- AUTHENTICATION ACTIONS ---
     signupForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const name = signupForm.name.value;
-        const whatsapp = signupForm.whatsapp.value;
-        const email = signupForm.email.value;
-        const password = signupForm.password.value;
-
+        const { name, whatsapp, email, password } = signupForm;
         try {
-            const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+            const userCredential = await auth.createUserWithEmailAndPassword(email.value, password.value);
             await db.collection('users').doc(userCredential.user.uid).set({
-                name: name,
-                whatsapp: whatsapp
+                name: name.value,
+                whatsapp: whatsapp.value
             });
             signupForm.reset();
             showPage(productsPage);
@@ -129,11 +159,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     loginForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const email = loginForm.email.value;
-        const password = loginForm.password.value;
-
+        const { email, password } = loginForm;
         try {
-            await auth.signInWithEmailAndPassword(email, password);
+            await auth.signInWithEmailAndPassword(email.value, password.value);
             loginForm.reset();
             if (!checkoutAfterLogin) {
                 showPage(productsPage);
@@ -143,51 +171,29 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    logoutButton.addEventListener('click', async () => {
-        await auth.signOut();
-        showPage(productsPage);
-    });
+    logoutButton.addEventListener('click', () => auth.signOut().then(() => showPage(productsPage)));
     
     // --- CHECKOUT ---
     async function performCheckout() {
         if (cart.length === 0 || !currentUser) return;
-
         const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-        
         try {
             await db.collection('orders').add({
-                customer: { 
-                    uid: currentUser.uid,
-                    name: currentUser.name,
-                    whatsapp: currentUser.whatsapp
-                },
+                customer: { uid: currentUser.uid, name: currentUser.name, whatsapp: currentUser.whatsapp },
                 items: JSON.parse(JSON.stringify(cart)),
                 total: total,
                 status: 'pending',
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
-
             const VENDEDOR_WHATSAPP = "5519981917697";
-            let pedidoText = cart.map(item => `- ${item.quantity} ${item.unit} de ${item.name}`).join('\n');
-            const mensagem = `Olá! Gostaria de fazer um pedido pelo site. 😊
-
-Meu nome: ${currentUser.name}
-
-Meu pedido:
-${pedidoText}
-
-Valor Total: R$ ${total.toFixed(2).replace('.', ',')}
-
-Aguardo as instruções para pagamento e entrega. Obrigado!`;
+            const pedidoText = cart.map(item => `- ${item.quantity} ${item.unit} de ${item.name}`).join('\n');
+            const mensagem = `Olá! Gostaria de fazer um pedido pelo site. 😊\n\nMeu nome: ${currentUser.name}\n\nMeu pedido:\n${pedidoText}\n\nValor Total: R$ ${total.toFixed(2).replace('.', ',')}\n\nAguardo as instruções para pagamento e entrega. Obrigado!`;
             const whatsappUrl = `https://wa.me/${VENDEDOR_WHATSAPP}?text=${encodeURIComponent(mensagem)}`;
-
             cart = [];
             updateCart();
             window.open(whatsappUrl, '_blank');
-
         } catch (error) {
-            console.error("Erro ao salvar o pedido: ", error);
-            showAlert('Erro', 'Não foi possível registrar seu pedido. Tente novamente.');
+            showAlert('Erro', 'Não foi possível registrar seu pedido.');
         }
     }
     
@@ -199,48 +205,68 @@ Aguardo as instruções para pagamento e entrega. Obrigado!`;
     toSignupLink.addEventListener('click', (e) => { e.preventDefault(); showPage(signupPage); });
     toLoginLink.addEventListener('click', (e) => { e.preventDefault(); showPage(loginPage); });
 
-    // --- ALERT MODAL ---
-    function showAlert(title, message) {
-        alertTitle.textContent = title;
-        alertMessage.textContent = message;
-        alertModal.classList.remove('hidden');
-    }
-    closeAlertModal.addEventListener('click', () => {
-        alertModal.classList.add('hidden');
-    });
-
-    // --- PRODUCT RENDERING ---
+    // --- PRODUCT MANAGEMENT ---
     async function fetchAndRenderProducts() {
         try {
             const snapshot = await db.collection('products').get();
             products = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            
-            productGrid.innerHTML = '';
-            products.forEach(product => {
-                const card = document.createElement('div');
-                card.className = 'bg-white rounded-lg shadow-md overflow-hidden transition-transform transform hover:-translate-y-1';
-                const stockInfo = product.stock > 0 ? `${product.stock} em estoque` : 'Sem estoque';
-                const buttonDisabled = product.stock <= 0 ? 'disabled' : '';
-                const buttonClasses = product.stock <= 0 ? 'bg-slate-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700';
+            renderProducts();
+        } catch (error) {
+            productGrid.innerHTML = `<p class="text-red-500">Não foi possível carregar os produtos.</p>`;
+        }
+    }
 
-                card.innerHTML = `
+    function renderProducts() {
+        productGrid.innerHTML = '';
+        products.forEach(product => {
+            const card = document.createElement('div');
+            card.className = 'bg-white rounded-lg shadow-md overflow-hidden flex flex-col';
+            const stockInfo = product.stock > 0 ? `${product.stock} em estoque` : 'Sem estoque';
+            const buttonDisabled = product.stock <= 0 ? 'disabled' : '';
+            const buttonClasses = product.stock <= 0 ? 'bg-slate-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700';
+
+            const adminDeleteButton = (currentUser && currentUser.isAdmin) ? `
+                <button data-product-id="${product.id}" class="delete-product-btn absolute top-2 right-2 text-red-500 bg-white/70 p-1 rounded-full hover:bg-red-500 hover:text-white transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 012 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd" /></svg>
+                </button>
+            ` : '';
+
+            card.innerHTML = `
+                <div class="relative">
                     <img src="${product.image}" alt="${product.name}" class="w-full h-48 object-cover">
-                    <div class="p-4">
-                        <h3 class="text-lg font-semibold">${product.name}</h3>
-                        <div class="flex justify-between items-center">
-                            <p class="text-slate-600">R$ ${product.price.toFixed(2).replace('.', ',')} / ${product.unit}</p>
-                            <p class="text-sm font-medium text-slate-500">${stockInfo}</p>
-                        </div>
-                        <button data-product-id="${product.id}" class="add-to-cart-btn mt-4 w-full text-white py-2 rounded-lg font-semibold transition-colors ${buttonClasses}" ${buttonDisabled}>
+                    ${adminDeleteButton}
+                </div>
+                <div class="p-4 flex flex-col flex-grow">
+                    <h3 class="text-lg font-semibold">${product.name}</h3>
+                    <div class="flex justify-between items-center mt-1">
+                        <p class="text-slate-600">R$ ${product.price.toFixed(2).replace('.', ',')} / ${product.unit}</p>
+                        <p class="text-sm font-medium text-slate-500">${stockInfo}</p>
+                    </div>
+                    <div class="mt-auto pt-4">
+                        <button data-product-id="${product.id}" class="add-to-cart-btn w-full text-white py-2 rounded-lg font-semibold transition-colors ${buttonClasses}" ${buttonDisabled}>
                             ${product.stock > 0 ? 'Adicionar ao Carrinho' : 'Indisponível'}
                         </button>
                     </div>
-                `;
-                productGrid.appendChild(card);
-            });
-        } catch (error) {
-            console.error("Erro ao carregar produtos: ", error);
-            productGrid.innerHTML = `<p class="text-red-500">Não foi possível carregar os produtos. Verifique a conexão com o Firebase.</p>`;
+                </div>
+            `;
+            productGrid.appendChild(card);
+        });
+    }
+
+    async function handleDeleteProduct(productId) {
+        const product = products.find(p => p.id === productId);
+        if (!product) return;
+
+        const confirmed = await showConfirm('Confirmar Exclusão', `Tem certeza que deseja excluir o produto "${product.name}"? Esta ação não pode ser desfeita.`);
+
+        if (confirmed) {
+            try {
+                await db.collection('products').doc(productId).delete();
+                showAlert('Sucesso!', 'Produto excluído.');
+                fetchAndRenderProducts();
+            } catch (error) {
+                showAlert('Erro', 'Não foi possível excluir o produto.');
+            }
         }
     }
     
@@ -331,8 +357,9 @@ Aguardo as instruções para pagamento e entrega. Obrigado!`;
         }
         const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
         cartTotalPrice.textContent = `R$ ${total.toFixed(2).replace('.', ',')}`;
-        cartItemCount.textContent = cart.length > 0 ? cart.reduce((sum, item) => sum + item.quantity, 0) : '0';
-        cartItemCount.classList.toggle('hidden', cart.length === 0);
+        const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+        cartItemCount.textContent = totalItems > 0 ? totalItems : '0';
+        cartItemCount.classList.toggle('hidden', totalItems === 0);
     }
 
     // --- ADMIN PANEL ---
@@ -354,14 +381,7 @@ Aguardo as instruções para pagamento e entrega. Obrigado!`;
                 const order = { id: doc.id, ...doc.data() };
                 const orderCard = document.createElement('div');
                 orderCard.className = 'bg-white rounded-lg shadow-md p-6';
-
-                const itemsHtml = order.items.map(item => `
-                    <li class="flex justify-between">
-                        <span>${item.quantity} ${item.unit} de ${item.name}</span>
-                        <span>R$ ${(item.price * item.quantity).toFixed(2).replace('.',',')}</span>
-                    </li>
-                `).join('');
-                
+                const itemsHtml = order.items.map(item => `<li class="flex justify-between"><span>${item.quantity} ${item.unit} de ${item.name}</span><span>R$ ${(item.price * item.quantity).toFixed(2).replace('.',',')}</span></li>`).join('');
                 const statusClasses = { pending: 'bg-yellow-100 text-yellow-800', completed: 'bg-green-100 text-green-800', cancelled: 'bg-red-100 text-red-800' };
                 const statusText = { pending: 'Pendente', completed: 'Concluído', cancelled: 'Cancelado' };
 
@@ -383,37 +403,29 @@ Aguardo as instruções para pagamento e entrega. Obrigado!`;
                     </div>
                 `;
                 orderList.appendChild(orderCard);
-
                 if (order.status === 'completed') totalSales += order.total;
             });
             updateSalesSummary(totalSales);
         }, error => {
-            console.error("Erro ao buscar pedidos: ", error);
             orderList.innerHTML = `<p class="text-center text-red-500">Erro ao carregar pedidos.</p>`;
         });
     }
     
     function updateSalesSummary(total) {
-        salesSummary.innerHTML = `
-            <p class="text-lg font-medium text-slate-700">Total de Vendas Válidas</p>
-            <p class="text-3xl font-bold text-green-600">R$ ${total.toFixed(2).replace('.',',')}</p>
-        `;
+        salesSummary.innerHTML = `<p class="text-lg font-medium text-slate-700">Total de Vendas Válidas</p><p class="text-3xl font-bold text-green-600">R$ ${total.toFixed(2).replace('.',',')}</p>`;
     }
     
     async function handleAdminAction(orderId, action) {
         const orderRef = db.collection('orders').doc(orderId);
-        
         if (action === 'cancel') {
             await orderRef.update({ status: 'cancelled' });
             return;
         }
-
         if (action === 'complete') {
             try {
                 await db.runTransaction(async (transaction) => {
                     const orderDoc = await transaction.get(orderRef);
                     if (!orderDoc.exists) throw "Pedido não encontrado!";
-                    
                     const orderData = orderDoc.data();
                     for (const item of orderData.items) {
                         const productRef = db.collection('products').doc(item.id);
@@ -429,7 +441,6 @@ Aguardo as instruções para pagamento e entrega. Obrigado!`;
                     transaction.update(orderRef, { status: 'completed' });
                 });
             } catch (error) {
-                console.error("Erro na transação: ", error);
                 showAlert("Erro de Estoque", String(error));
             }
         }
@@ -441,22 +452,27 @@ Aguardo as instruções para pagamento e entrega. Obrigado!`;
     cartSidebar.addEventListener('click', (e) => (e.target === cartSidebar) && toggleCart());
 
     productGrid.addEventListener('click', (e) => {
-        const button = e.target.closest('.add-to-cart-btn');
-        if (button) {
-            const productId = button.dataset.productId;
+        const addButton = e.target.closest('.add-to-cart-btn');
+        if (addButton) {
+            const productId = addButton.dataset.productId;
             addToCart(productId);
-            
-            button.textContent = 'Adicionado! ✓';
-            button.classList.remove('bg-green-600', 'hover:bg-green-700');
-            button.classList.add('bg-orange-500', 'cursor-default');
+            addButton.textContent = 'Adicionado! ✓';
+            addButton.classList.remove('bg-green-600', 'hover:bg-green-700');
+            addButton.classList.add('bg-orange-500', 'cursor-default');
             setTimeout(() => {
                 const product = products.find(p => p.id === productId);
                 if (product && product.stock > 0){
-                    button.textContent = 'Adicionar ao Carrinho';
-                    button.classList.remove('bg-orange-500', 'cursor-default');
-                    button.classList.add('bg-green-600', 'hover:bg-green-700');
+                    addButton.textContent = 'Adicionar ao Carrinho';
+                    addButton.classList.remove('bg-orange-500', 'cursor-default');
+                    addButton.classList.add('bg-green-600', 'hover:bg-green-700');
                 }
             }, 1500);
+            return;
+        }
+        const deleteButton = e.target.closest('.delete-product-btn');
+        if (deleteButton) {
+            const productId = deleteButton.dataset.productId;
+            handleDeleteProduct(productId);
         }
     });
 
@@ -466,7 +482,6 @@ Aguardo as instruções para pagamento e entrega. Obrigado!`;
             const productId = button.dataset.productId;
             const item = cart.find(i => i.id === productId);
             if (!item) return;
-
             if (button.classList.contains('quantity-change-btn')) {
                 const newQuantity = button.dataset.action === 'increase' ? item.quantity + 1 : item.quantity - 1;
                 updateCartItemQuantity(productId, newQuantity);
@@ -509,11 +524,7 @@ Aguardo as instruções para pagamento e entrega. Obrigado!`;
 
     addProductForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        if (!currentUser || !currentUser.isAdmin) {
-            showAlert('Acesso Negado', 'Você não tem permissão para realizar esta ação.');
-            return;
-        }
-
+        if (!currentUser || !currentUser.isAdmin) return showAlert('Acesso Negado', 'Você não tem permissão.');
         const newProduct = {
             name: addProductForm.querySelector('#product-name').value,
             price: parseFloat(addProductForm.querySelector('#product-price').value),
@@ -521,16 +532,14 @@ Aguardo as instruções para pagamento e entrega. Obrigado!`;
             stock: parseInt(addProductForm.querySelector('#product-stock').value),
             image: addProductForm.querySelector('#product-image').value,
         };
-
         try {
             await db.collection('products').add(newProduct);
-            showAlert('Sucesso!', `Produto "${newProduct.name}" adicionado com sucesso.`);
+            showAlert('Sucesso!', `Produto "${newProduct.name}" adicionado.`);
             addProductForm.reset();
             addProductForm.classList.add('hidden');
             showAddProductFormBtn.classList.remove('hidden');
             fetchAndRenderProducts();
         } catch (error) {
-            console.error("Erro ao adicionar produto: ", error);
             showAlert('Erro', 'Não foi possível adicionar o produto.');
         }
     });
@@ -543,4 +552,3 @@ Aguardo as instruções para pagamento e entrega. Obrigado!`;
 
     initializeApp();
 });
-

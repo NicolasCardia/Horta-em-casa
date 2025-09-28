@@ -108,7 +108,6 @@
                 <div id="sales-summary" class="text-right"></div>
             </div>
 
-            <!-- Controles do Admin (Adicionar Produto) -->
             <div id="admin-controls-container" class="hidden mb-8">
                 <button id="show-add-product-form-btn" class="bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">
                     + Adicionar Novo Produto
@@ -143,42 +142,32 @@
             </div>
             
             <h2 class="text-2xl font-bold text-slate-800 mb-4">Pedidos Recebidos</h2>
-            <div id="order-list" class="space-y-6">
-                <!-- Lista de pedidos será inserida aqui -->
-            </div>
+            <div id="order-list" class="space-y-6"></div>
         </section>
     </main>
 
     <!-- CARRINHO DE COMPRAS (SIDEBAR) -->
-    <div id="cart-sidebar" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50" aria-labelledby="slide-over-title" role="dialog" aria-modal="true">
+    <div id="cart-sidebar" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50">
         <div class="absolute inset-0 overflow-hidden">
             <div id="cart-content" class="pointer-events-none fixed inset-y-0 right-0 flex max-w-full pl-10 transform transition-transform ease-in-out duration-500 translate-x-full">
                 <div class="pointer-events-auto w-screen max-w-md">
                     <div class="flex h-full flex-col overflow-y-scroll bg-white shadow-xl">
                         <div class="flex-1 overflow-y-auto py-6 px-4 sm:px-6">
                             <div class="flex items-start justify-between">
-                                <h2 class="text-lg font-medium text-gray-900" id="slide-over-title">Carrinho de Compras</h2>
+                                <h2 class="text-lg font-medium text-gray-900">Carrinho de Compras</h2>
                                 <div class="ml-3 flex h-7 items-center">
                                     <button type="button" id="close-cart-button" class="-m-2 p-2 text-gray-400 hover:text-gray-500">
-                                        <span class="sr-only">Fechar painel</span>
-                                        <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                        <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
                                     </button>
                                 </div>
                             </div>
-                            <div class="mt-8">
-                                <div class="flow-root">
-                                    <p id="empty-cart-message" class="text-center text-slate-500">Seu carrinho está vazio.</p>
-                                    <ul id="cart-items-list" role="list" class="-my-6 divide-y divide-gray-200">
-                                        <!-- Itens do carrinho serão inseridos aqui -->
-                                    </ul>
-                                </div>
-                            </div>
+                            <div class="mt-8"><div class="flow-root">
+                                <p id="empty-cart-message" class="text-center text-slate-500">Seu carrinho está vazio.</p>
+                                <ul id="cart-items-list" role="list" class="-my-6 divide-y divide-gray-200"></ul>
+                            </div></div>
                         </div>
                         <div class="border-t border-gray-200 py-6 px-4 sm:px-6">
-                            <div class="flex justify-between text-base font-medium text-gray-900">
-                                <p>Subtotal</p>
-                                <p id="cart-total-price">R$ 0,00</p>
-                            </div>
+                            <div class="flex justify-between text-base font-medium text-gray-900"><p>Subtotal</p><p id="cart-total-price">R$ 0,00</p></div>
                             <p class="mt-0.5 text-sm text-gray-500">Taxas de entrega serão combinadas via WhatsApp.</p>
                             <div class="mt-6">
                                 <button id="checkout-button" disabled class="w-full flex items-center justify-center rounded-md border border-transparent bg-green-600 px-6 py-3 text-base font-medium text-white shadow-sm hover:bg-green-700 disabled:bg-slate-400 disabled:cursor-not-allowed">Finalizar Pedido</button>
@@ -199,6 +188,18 @@
         </div>
     </div>
 
+    <!-- MODAL DE CONFIRMAÇÃO (NOVO) -->
+    <div id="confirm-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl p-6 max-w-sm w-full">
+            <h3 id="confirm-title" class="text-lg font-bold text-slate-800">Confirmar Ação</h3>
+            <p id="confirm-message" class="text-sm text-slate-600 mt-2">Você tem certeza?</p>
+            <div class="mt-6 flex justify-end gap-4">
+                <button id="cancel-btn" class="bg-slate-200 text-slate-800 font-semibold py-2 px-4 rounded-md hover:bg-slate-300">Cancelar</button>
+                <button id="confirm-btn" class="bg-red-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-red-700">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
@@ -209,3 +210,4 @@
     <script src="script.js"></script>
 </body>
 </html>
+
