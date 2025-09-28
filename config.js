@@ -9,4 +9,4 @@ const firebaseConfig = {
     }; 
 
 // --- CONFIGURAÇÃO DE ADMIN ---
-const ADMIN_UID = "7OENAgt8pheLgKweOQqCnJaIpf03";
+const ADMIN_UID = "3AuUz8Hl7GcckyWjLY4gnZl6Zzq1";
