@@ -9,7 +9,6 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="icon" type="image/jpeg" href="assets\Brazfruit_logo.jpeg">
     <style>
         body { font-family: 'Inter', sans-serif; }
     </style>
@@ -19,10 +18,7 @@
     <!-- CABEÇALHO DA APLICAÇÃO -->
     <header id="app-header" class="bg-white shadow-sm sticky top-0 z-40 hidden">
         <nav class="container mx-auto px-4 py-3 flex justify-between items-center">
-            <a href="#" id="home-link" class="flex items-center gap-2">
-            <img src="assets/Brazfruit_logo.jpeg" alt="logo_brazfruit" class="h-8 w-auto">
-            <span class="text-2xl font-bold text-green-700">Horta em Casa</span>
-            </a>
+            <a href="#" id="home-link" class="text-2xl font-bold text-green-700">Horta em Casa</a>
             
             <div class="flex items-center gap-4">
                 <div id="logged-out-view" class="flex items-center gap-4">
@@ -62,6 +58,13 @@
                     </div>
                     <button type="submit" class="w-full bg-green-600 text-white py-2 px-4 rounded-md font-semibold hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">Entrar</button>
                 </form>
+                <!-- Botão Google -->
+                <div class="mt-4">
+                    <button id="google-login-btn" type="button" class="w-full flex items-center justify-center gap-2 bg-white border border-slate-300 py-2 rounded-md font-semibold text-slate-700 hover:bg-slate-100">
+                        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" class="h-5 w-5">
+                        Entrar com Google
+                    </button>
+                </div>
                 <p class="mt-6 text-center text-sm text-slate-500">
                     Não tem uma conta? <a href="#" id="to-signup-link" class="font-medium text-green-600 hover:text-green-500">Cadastre-se</a>
                 </p>
@@ -169,6 +172,21 @@
                                 <p id="empty-cart-message" class="text-center text-slate-500">Seu carrinho está vazio.</p>
                                 <ul id="cart-items-list" role="list" class="-my-6 divide-y divide-gray-200"></ul>
                             </div></div>
+                            <!-- NOVO: Seleção de entrega/retirada -->
+                            <div id="delivery-option-container" class="mt-6 hidden">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Como você prefere receber?</label>
+                                <div class="flex gap-4">
+                                    <label class="flex items-center">
+                                        <input type="radio" id="delivery-radio" name="delivery-type" class="mr-2" value="delivery">
+                                        <span>Entregar em casa</span>
+                                    </label>
+                                    <label class="flex items-center">
+                                        <input type="radio" id="pickup-radio" name="delivery-type" class="mr-2" value="pickup">
+                                        <span>Retirar no local</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <!-- FIM NOVO -->
                         </div>
                         <div class="border-t border-gray-200 py-6 px-4 sm:px-6">
                             <div class="flex justify-between text-base font-medium text-gray-900"><p>Subtotal</p><p id="cart-total-price">R$ 0,00</p></div>
@@ -200,6 +218,19 @@
             <div class="mt-6 flex justify-end gap-4">
                 <button id="cancel-btn" class="bg-slate-200 text-slate-800 font-semibold py-2 px-4 rounded-md hover:bg-slate-300">Cancelar</button>
                 <button id="confirm-btn" class="bg-red-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-red-700">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE ENDEREÇO (NOVO) -->
+    <div id="address-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl p-6 max-w-sm w-full">
+            <h3 class="text-lg font-bold text-slate-800 mb-2">Endereço para Entrega</h3>
+            <p class="text-sm text-slate-600 mb-4">Informe o endereço completo para entrega do pedido.</p>
+            <input type="text" id="address-input" class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 mb-4" placeholder="Ex: Rua, número, bairro, cidade">
+            <div class="flex gap-4 justify-end">
+                <button id="close-address-modal-btn" class="bg-slate-200 text-slate-800 font-semibold py-2 px-4 rounded-md hover:bg-slate-300">Cancelar</button>
+                <button id="save-address-btn" class="bg-green-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-green-700">Salvar Endereço</button>
             </div>
         </div>
     </div>

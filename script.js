@@ -61,6 +61,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const addProductForm = document.getElementById('add-product-form');
     const cancelAddProductBtn = document.getElementById('cancel-add-product-btn');
 
+    // --- NOVOS ELEMENTOS PARA ENTREGA/RETIRADA ---
+    const deliveryOptionContainer = document.getElementById('delivery-option-container');
+    const deliveryRadio = document.getElementById('delivery-radio');
+    const pickupRadio = document.getElementById('pickup-radio');
+    const addressModal = document.getElementById('address-modal');
+    const addressInput = document.getElementById('address-input');
+    const saveAddressBtn = document.getElementById('save-address-btn');
+    const closeAddressModalBtn = document.getElementById('close-address-modal-btn');
+
+    // --- NOVO ESTADO ---
+    let deliveryType = null; // 'delivery' ou 'pickup'
+    let deliveryAddress = '';
+
     // --- NAVIGATION ---
     function showPage(pageToShow) {
         [loginPage, signupPage, productsPage, adminPage].forEach(page => page.classList.add('hidden'));
@@ -173,9 +186,40 @@ document.addEventListener('DOMContentLoaded', () => {
 
     logoutButton.addEventListener('click', () => auth.signOut().then(() => showPage(productsPage)));
     
+    // --- GOOGLE LOGIN ---
+    const googleLoginBtn = document.getElementById('google-login-btn');
+    googleLoginBtn.addEventListener('click', async () => {
+        const provider = new firebase.auth.GoogleAuthProvider();
+        try {
+            const result = await auth.signInWithPopup(provider);
+            const user = result.user;
+            // Se for novo usuário, salva dados mínimos no Firestore
+            const userDoc = await db.collection('users').doc(user.uid).get();
+            if (!userDoc.exists) {
+                await db.collection('users').doc(user.uid).set({
+                    name: user.displayName || 'Usuário',
+                    whatsapp: '', // Pode pedir depois
+                    email: user.email
+                });
+            }
+            showPage(productsPage);
+        } catch (error) {
+            showAlert('Erro no Login', error.message);
+        }
+    });
+
     // --- CHECKOUT ---
     async function performCheckout() {
         if (cart.length === 0 || !currentUser) return;
+        if (!deliveryType) {
+            showAlert('Escolha obrigatória', 'Selecione se deseja entrega em casa ou retirada no local.');
+            return;
+        }
+        if (deliveryType === 'delivery' && !deliveryAddress.trim()) {
+            showAddressModal();
+            showAlert('Endereço obrigatório', 'Informe o endereço para entrega.');
+            return;
+        }
         const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
         try {
             await db.collection('orders').add({
@@ -183,13 +227,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 items: JSON.parse(JSON.stringify(cart)),
                 total: total,
                 status: 'pending',
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                deliveryType,
+                deliveryAddress: deliveryType === 'delivery' ? deliveryAddress : null
             });
             const VENDEDOR_WHATSAPP = "5519981917697";
             const pedidoText = cart.map(item => `- ${item.quantity} ${item.unit} de ${item.name}`).join('\n');
-            const mensagem = `Olá! Gostaria de fazer um pedido pelo site. 😊\n\nMeu nome: ${currentUser.name}\n\nMeu pedido:\n${pedidoText}\n\nValor Total: R$ ${total.toFixed(2).replace('.', ',')}\n\nAguardo as instruções para pagamento e entrega. Obrigado!`;
+            let mensagem = `Olá! Gostaria de fazer um pedido pelo site.\n\nMeu nome: ${currentUser.name}\n\nMeu pedido:\n${pedidoText}\n\nValor Total: R$ ${total.toFixed(2).replace('.', ',')}\n`;
+            if (deliveryType === 'delivery') {
+                mensagem += `\nEndereço para entrega: ${deliveryAddress}\n`;
+            } else {
+                mensagem += `\nOpção escolhida: Retirar no local\n`;
+            }
+            mensagem += `\nAguardo as instruções para pagamento e entrega. Obrigado!`;
             const whatsappUrl = `https://wa.me/${VENDEDOR_WHATSAPP}?text=${encodeURIComponent(mensagem)}`;
             cart = [];
+            deliveryType = null;
+            deliveryAddress = '';
             updateCart();
             window.open(whatsappUrl, '_blank');
         } catch (error) {
@@ -543,6 +597,81 @@ document.addEventListener('DOMContentLoaded', () => {
             showAlert('Erro', 'Não foi possível adicionar o produto.');
         }
     });
+
+    // --- MODAL DE ENDEREÇO ---
+    function showAddressModal() {
+        addressModal.classList.remove('hidden');
+        addressInput.value = deliveryAddress || '';
+    }
+    function closeAddressModal() {
+        addressModal.classList.add('hidden');
+    }
+    saveAddressBtn.addEventListener('click', () => {
+        if (!addressInput.value.trim()) {
+            showAlert('Endereço obrigatório', 'Por favor, informe o endereço para entrega.');
+            return;
+        }
+        deliveryAddress = addressInput.value.trim();
+        closeAddressModal();
+    });
+    closeAddressModalBtn.addEventListener('click', closeAddressModal);
+
+    // --- SELEÇÃO ENTREGA/RETIRADA ---
+    deliveryRadio.addEventListener('change', () => {
+        deliveryType = 'delivery';
+        showAddressModal();
+    });
+    pickupRadio.addEventListener('change', () => {
+        deliveryType = 'pickup';
+        deliveryAddress = '';
+    });
+
+    // --- ATUALIZAR CARRINHO PARA EXIGIR ESCOLHA ---
+    function updateCart() {
+        cartItemsList.innerHTML = '';
+        if (cart.length === 0) {
+            emptyCartMessage.style.display = 'block';
+            checkoutButton.disabled = true;
+        } else {
+            emptyCartMessage.style.display = 'none';
+            checkoutButton.disabled = false;
+            cart.forEach(item => {
+                const li = document.createElement('li');
+                li.className = 'flex py-6';
+                li.innerHTML = `
+                    <div class="h-24 w-24 flex-shrink-0 overflow-hidden rounded-md border border-gray-200">
+                        <img src="${item.image}" alt="${item.name}" class="h-full w-full object-cover object-center">
+                    </div>
+                    <div class="ml-4 flex flex-1 flex-col">
+                        <div>
+                            <div class="flex justify-between text-base font-medium text-gray-900">
+                                <h3>${item.name}</h3>
+                                <p class="ml-4">R$ ${(item.price * item.quantity).toFixed(2).replace('.', ',')}</p>
+                            </div>
+                        </div>
+                        <div class="flex flex-1 items-end justify-between text-sm">
+                            <div class="flex items-center border border-gray-200 rounded">
+                                <button data-product-id="${item.id}" data-action="decrease" class="quantity-change-btn px-2 py-1">-</button>
+                                <p class="text-gray-500 w-8 text-center">Qtd ${item.quantity}</p>
+                                <button data-product-id="${item.id}" data-action="increase" class="quantity-change-btn px-2 py-1">+</button>
+                            </div>
+                            <div class="flex">
+                                <button data-product-id="${item.id}" type="button" class="font-medium text-red-600 hover:text-red-500 remove-item-btn">Remover</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                cartItemsList.appendChild(li);
+            });
+        }
+        const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+        cartTotalPrice.textContent = `R$ ${total.toFixed(2).replace('.', ',')}`;
+        const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+        cartItemCount.textContent = totalItems > 0 ? totalItems : '0';
+        cartItemCount.classList.toggle('hidden', totalItems === 0);
+        // Exibir seleção obrigatória
+        deliveryOptionContainer.classList.remove('hidden');
+    }
 
     // --- INITIALIZATION ---
     function initializeApp() {

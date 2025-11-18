@@ -153,7 +153,7 @@ async function performCheckout() {
         // 2. Prepara a mensagem para o WhatsApp
         const VENDEDOR_WHATSAPP = "5519981917697"; // Seu número de WhatsApp
         const pedidoText = cart.map(item => `- ${item.quantity} ${item.unit} de ${item.name}`).join('\n');
-        const mensagem = `Olá! Gostaria de fazer um pedido pelo site. 😊\n\nMeu nome: ${currentUser.name}\n\nMeu pedido:\n${pedidoText}\n\nValor Total: R$ ${total.toFixed(2).replace('.', ',')}\n\nAguardo as instruções para pagamento e entrega. Obrigado!`;
+        const mensagem = `Olá! Gostaria de fazer um pedido pelo site.\n\nMeu nome: ${currentUser.name}\n\nMeu pedido:\n${pedidoText}\n\nValor Total: R$ ${total.toFixed(2).replace('.', ',')}\n\nAguardo as instruções para pagamento e entrega. Obrigado!`;
         const whatsappUrl = `https://wa.me/${VENDEDOR_WHATSAPP}?text=${encodeURIComponent(mensagem)}`;
 
         // 3. Limpa o carrinho e redireciona o usuário
